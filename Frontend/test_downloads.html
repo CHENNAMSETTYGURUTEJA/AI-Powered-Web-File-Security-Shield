@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishShield File Security Test</title>
+    <style>
+        body { font-family: sans-serif; padding: 50px; text-align: center; }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            margin: 20px;
+            text-decoration: none;
+            color: white;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+        .safe { background-color: #4CAF50; }
+        .malicious { background-color: #f44336; }
+        h1 { margin-bottom: 40px; }
+        p { color: #666; max-width: 600px; margin: 0 auto 30px auto; }
+    </style>
+</head>
+<body>
+
+    <h1>PhishShield File Security Test</h1>
+    <p>Use the buttons below to trigger downloads. Your extension should intercept these.</p>
+
+    <!-- Safe File: PDF, normal name -->
+    <a href="data:application/pdf;base64,JVBERi0xLg==" download="safe_document.pdf" class="btn safe">
+        Download Safe PDF
+    </a>
+
+    <!-- Malicious File: EXE, suspicious name -->
+    <!-- The backend model is trained to flag 'virus.exe' or 'crack' as malicious -->
+    <a href="data:application/x-msdownload;base64,TVqQAAMAAAAEAAAA//" download="virus.exe" class="btn malicious">
+        Download Malicious EXE
+    </a>
+    
+    <br><br>
+    
+    <a href="data:application/zip;base64,UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==" download="crack_installer.zip" class="btn malicious">
+        Download Suspicious ZIP (Crack)
+    </a>
+
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishShield - File Blocked</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffe6e6;
+            color: #333;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .container {
+            background: white;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-left: 10px solid #ff4444;
+        }
+
+        h1 {
+            color: #d32f2f;
+            margin-top: 0;
+        }
+
+        .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .filename {
+            font-weight: bold;
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="icon">🚨</div>
+        <h1>Malicious File Blocked</h1>
+        <p>PhishShield has prevented a file download to protect your security.</p>
+        <p>File: <span id="filename" class="filename">Unknown</span></p>
+        <p>Reason: <strong>Detected as Malicious</strong> by our security engine.</p>
+
+        <a href="#" id="close-btn" class="btn">Close</a>
+    </div>
+
+    <script src="blocked.js"></script>
+
+</body>
+
+</html>
