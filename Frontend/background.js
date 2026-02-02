@@ -21,12 +21,12 @@ function storeScanHistory(result) {
       timestamp: new Date().toLocaleString(),
       reported: false
     });
-    
+
     // Keep only the last 10 items
     if (history.length > MAX_HISTORY_ITEMS) {
       history.pop();
     }
-    
+
     chrome.storage.local.set({ scanHistory: history });
   });
 }
@@ -34,7 +34,7 @@ function storeScanHistory(result) {
 // Show a warning or safe popup on the webpage
 function injectPopup(tabId, url, isPhishing, isSamePage = false) {
   const hostname = new URL(url).hostname;
-  
+
   if (isPhishing) {
     // Create and show phishing warning popup
     const popupHTML = `
@@ -276,8 +276,18 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
 async function checkForPhishing(url, tabId, isReload = false) {
   try {
     const domain = getDomain(url);
+
+    // Ignore restricted protocols
+    if (url.startsWith('chrome://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('devtools://') ||
+      url.startsWith('about:') ||
+      url.startsWith('edge://')) {
+      return;
+    }
+
     const tabState = tabStates.get(tabId);
-    
+
     // ===================================================
     // SAME DOMAIN CHECK LOGIC
     // ===================================================
@@ -292,20 +302,20 @@ async function checkForPhishing(url, tabId, isReload = false) {
     if (history.length > 0) {
       // Get the domain from the most recent scan
       const mostRecentDomain = getDomain(history[0].url);
-      
+
       // If the current domain matches the most recently scanned domain
       if (mostRecentDomain === domain) {
         // If this is a reload, show the same indicator as before
         if (isReload) {
           injectPopup(tabId, url, history[0].isPhishing, false);
         }
-        
+
         // Update tab state
         tabStates.set(tabId, {
           domain: domain,
           previousUrl: url
         });
-        
+
         return history[0];
       }
     }
@@ -349,16 +359,16 @@ async function checkForPhishing(url, tabId, isReload = false) {
         isPhishing: false,
         timestamp: new Date().toLocaleString()
       };
-      
+
       // Save result and show safe indicator
       storeScanHistory(result);
       injectPopup(tabId, url, false, false);
-      
+
       return result;
     }
 
     // Check URL using our ML model
-    const response = await fetch("https://phishshield-11y5.onrender.com/predict_url", {
+    const response = await fetch("http://127.0.0.1:8000/predict_url", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -375,7 +385,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
       domain: domain,
       previousUrl: url
     });
-    
+
     // Create result object
     const result = {
       url,
