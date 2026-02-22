@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Phishing Detector</title>
@@ -11,32 +12,39 @@
       border-radius: 4px;
       background: #f5f5f5;
     }
+
     .history-entry.phishing {
       border-left: 4px solid #ff4444;
     }
+
     .history-entry.safe {
       border-left: 4px solid #4CAF50;
     }
+
     .history-entry .url {
       color: #666;
       font-size: 12px;
       word-break: break-all;
     }
+
     .history-entry .time {
       color: #999;
       font-size: 11px;
     }
+
     .report-link {
       color: #ff4444;
       text-decoration: none;
       font-size: 12px;
       margin-left: 5px;
     }
+
     .report-link:hover {
       text-decoration: underline;
     }
   </style>
 </head>
+
 <body>
   <h3>🔎 Phishing URL Checker</h3>
   <div id="currentStatus">
@@ -44,10 +52,22 @@
     <div id="result" style="margin-top: 10px;"></div>
   </div>
 
-  <hr>
+  <hr style="margin-top: 20px;">
+  <h4>📁 File Scanner</h4>
+  <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #ccc; text-align: center;">
+    <input type="file" id="fileInput" style="display: none;" />
+    <button id="uploadBtn"
+      style="background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;">
+      Upload File to Scan
+    </button>
+    <div id="fileScanStatus" style="margin-top: 10px; font-size: 13px;"></div>
+  </div>
+
+  <hr style="margin-top: 20px;">
   <h4>📜 Recent Scans</h4>
   <div id="history"></div>
 
   <script src="popup.js"></script>
 </body>
+
 </html>

@@ -67,15 +67,6 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
         </div>
         <p style="margin: 10px 0;">The website "${hostname}" has been detected as a potential phishing site.</p>
         <div style="display: flex; gap: 10px; margin-top: 15px;">
-          <button id="close-tab-btn" style="
-            background: white;
-            color: #ff4444;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-          ">Close Tab</button>
           <button id="report-btn" style="
             background: white;
             color: #ff4444;
@@ -105,10 +96,6 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
         // Add event listeners for popup buttons
         document.getElementById('close-popup-btn').addEventListener('click', () => {
           popup.remove();
-        });
-
-        document.getElementById('close-tab-btn').addEventListener('click', () => {
-          window.close();
         });
 
         document.getElementById('report-btn').addEventListener('click', () => {
@@ -351,16 +338,26 @@ async function checkForPhishing(url, tabId, isReload = false) {
       'cloudflare.com'
     ];
 
-    // If domain is trusted, mark it as safe
+    // If domain is trusted locally, we still want it logged in the backend dashboard
     const isTrusted = trustedDomains.some(trustedDomain => domain.includes(trustedDomain));
     if (isTrusted) {
+      // Fire-and-forget fetch to ensure the backend logs this as a SAFE scan
+      fetch("http://127.0.0.1:8000/api/scan-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "phishshield-ext-key-2026"
+        },
+        body: JSON.stringify({ url: url }),
+      }).catch(err => console.error("Failed to log trusted domain:", err));
+
       const result = {
         url,
         isPhishing: false,
         timestamp: new Date().toLocaleString()
       };
 
-      // Save result and show safe indicator
+      // Save result locally and show safe indicator
       storeScanHistory(result);
       injectPopup(tabId, url, false, false);
 
@@ -368,17 +365,24 @@ async function checkForPhishing(url, tabId, isReload = false) {
     }
 
     // Check URL using our ML model
-    const response = await fetch("http://127.0.0.1:8000/predict_url", {
+    const response = await fetch("http://127.0.0.1:8000/api/scan-url", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-api-key": "phishshield-ext-key-2026"
       },
       body: JSON.stringify({ url: url }),
     });
 
-    if (!response.ok) throw new Error(`Status ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Unauthorized - API Key is invalid or missing");
+      }
+      throw new Error(`Status ${response.status}`);
+    }
+
     const data = await response.json();
-    const isPhishing = data.prediction === 0;
+    const isPhishing = data.isPhishing;
 
     // Update tab information
     tabStates.set(tabId, {
@@ -465,6 +469,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 setInterval(() => {
   tabStates.clear();
 }, 30 * 60 * 1000);
+
+// Heartbeat Ping to Backend Every 30 seconds
+setInterval(async () => {
+  try {
+    await fetch("http://127.0.0.1:8000/api/ping", {
+      method: "POST",
+      headers: {
+        "x-api-key": "phishshield-ext-key-2026"
+      }
+    });
+  } catch (e) {
+    console.error("Heartbeat ping failed:", e);
+  }
+}, 30 * 1000);
 
 // Log when the extension starts
 console.log("Phishing Detector background script started"); 

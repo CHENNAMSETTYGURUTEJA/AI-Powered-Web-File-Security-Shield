@@ -19,12 +19,22 @@ class URLFeatureExtractor:
         self.error = None
 
         try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Upgrade-Insecure-Requests': '1'
+            }
             self.response = requests.get(url, headers=headers, timeout=self.timeout)
             self.page_content = self.response.text
             self.soup = BeautifulSoup(self.page_content, 'html.parser')
         except Exception as e:
-            self.error = str(e)
+            print(f"Connection failed for {url}: {e}")
+            # Do NOT set self.error here so that URL-based features are still extracted
+            pass
 
     def safe_parse(self, url):
         try:
@@ -141,7 +151,17 @@ class URLFeatureExtractor:
         if not self.response:
             return 0
         return 1 if len(self.response.history)>0 else -1
-        
+
+    def is_trusted_domain(self):
+        # Fallback for sites that block scraping like ChatGPT, Google, Cloudflare protected sites
+        trusted = [
+            'google.com', 'chatgpt.com', 'openai.com', 'youtube.com', 'facebook.com', 
+            'twitter.com', 'instagram.com', 'linkedin.com', 'github.com', 'microsoft.com',
+            'apple.com', 'amazon.com', 'netflix.com', 'wikipedia.org', 'reddit.com',
+            'stackoverflow.com', 'yahoo.com', 'bing.com', 'whatsapp.com', 'zoom.us'
+        ]
+        return any(self.domain.endswith(t) for t in trusted)
+
 
     def extract_model_features(self):
         if self.error:
@@ -180,7 +200,7 @@ class URLFeatureExtractor:
             'popUpWindow': self.has_popup_window(),
             'Iframe': self.has_iframe(),
             'Abnormal_URL': self.is_abnormal_url(),
-            'LetterToDigitRatio': self.get_letter_ratio_in_url() / (self.get_digit_ratio_in_url() + 1e-5),
+            'LetterToDigitRatio': self.get_letter_ratio_in_url() / max(self.get_digit_ratio_in_url(), 0.05),
             'Redirect_0': redirect_0,
             'Redirect_1': redirect_1
         }
