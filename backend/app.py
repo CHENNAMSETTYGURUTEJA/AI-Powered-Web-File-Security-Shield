@@ -25,6 +25,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import time
+from fastapi import Request
+
+# ✅ Centralized request logging middleware for debugging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    print(f"[{request.method}] {request.url.path} - Status: {response.status_code} - {process_time:.4f}s")
+    return response
+
 # API Key for Extension Authentication
 EXTENSION_API_KEY = "phishshield-ext-key-2026"
 
@@ -251,7 +263,7 @@ def read_root():
     return {"message": "PhishShield API is running 🚀"}
 
 # ✅ Get Threat Logs
-@app.get("/logs")
+@app.get("/api/logs")
 def get_threat_logs():
     try:
         logs = get_logs()
@@ -260,13 +272,18 @@ def get_threat_logs():
         return {"error": str(e)}
 
 # ✅ Delete Threat Log
-@app.delete("/logs/{scan_id}")
+@app.delete("/api/logs/{scan_id}")
 def delete_threat_log(scan_id: str):
     try:
         delete_log(scan_id)
         return {"message": "Log deleted successfully"}
     except Exception as e:
         return {"error": str(e)}
+
+# ✅ Health Check endpoint for Render wake-up 
+@app.get("/api/health")
+def health_check():
+    return {"status": "awake", "message": "Backend is ready"}
 
 # ==========================================
 # 🔌 EXTENSION INTEGRATION ENDPOINTS

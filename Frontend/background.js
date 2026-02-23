@@ -1,3 +1,24 @@
+// --- Configuration ---
+// Change to your deployed Render URL for production
+const API_BASE_URL = "https://phishshield-backend.onrender.com";
+const API_KEY = "phishshield-ext-key-2026";
+
+// --- Utility: Fetch with Retry for Render Cold Starts ---
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      if (response.status === 401) throw new Error("Unauthorized - API Key is invalid or missing");
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      console.log(`Fetch failed, retrying (${i + 1}/${maxRetries}). Waking up server...`);
+      // Wait 3 seconds before retrying to allow Render to wake up
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  }
+}
+
 // Store information about each tab's state
 const tabStates = new Map(); // { tabId: { domain: string, previousUrl: string } }
 const MAX_HISTORY_ITEMS = 10; // Maximum number of scan history items to keep
@@ -342,11 +363,11 @@ async function checkForPhishing(url, tabId, isReload = false) {
     const isTrusted = trustedDomains.some(trustedDomain => domain.includes(trustedDomain));
     if (isTrusted) {
       // Fire-and-forget fetch to ensure the backend logs this as a SAFE scan
-      fetch("http://127.0.0.1:8000/api/scan-url", {
+      fetchWithRetry(`${API_BASE_URL}/api/scan-url`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": "phishshield-ext-key-2026"
+          "x-api-key": API_KEY
         },
         body: JSON.stringify({ url: url }),
       }).catch(err => console.error("Failed to log trusted domain:", err));
@@ -365,21 +386,14 @@ async function checkForPhishing(url, tabId, isReload = false) {
     }
 
     // Check URL using our ML model
-    const response = await fetch("http://127.0.0.1:8000/api/scan-url", {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/scan-url`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": "phishshield-ext-key-2026"
+        "x-api-key": API_KEY
       },
       body: JSON.stringify({ url: url }),
     });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Unauthorized - API Key is invalid or missing");
-      }
-      throw new Error(`Status ${response.status}`);
-    }
 
     const data = await response.json();
     const isPhishing = data.isPhishing;
@@ -473,10 +487,10 @@ setInterval(() => {
 // Heartbeat Ping to Backend Every 30 seconds
 setInterval(async () => {
   try {
-    await fetch("http://127.0.0.1:8000/api/ping", {
+    await fetch(`${API_BASE_URL}/api/ping`, {
       method: "POST",
       headers: {
-        "x-api-key": "phishshield-ext-key-2026"
+        "x-api-key": API_KEY
       }
     });
   } catch (e) {

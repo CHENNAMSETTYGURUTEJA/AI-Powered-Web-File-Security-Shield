@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", function () {
       formData.append("file", file);
 
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/scan-file", {
+        const response = await fetch("https://phishshield-backend.onrender.com/api/scan-file", {
           method: "POST",
           headers: {
             "x-api-key": "phishshield-ext-key-2026"
