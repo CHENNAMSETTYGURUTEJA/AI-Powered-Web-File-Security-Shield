@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
                class="report-link">Report</a>
           </div>
           <div class="url">${entry.url}</div>
-          <div class="time">Scanned at: ${entry.timestamp}</div>
+          <div class="time">Scanned at: ${new Date(entry.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
         `;
         historyDiv.appendChild(el);
       });

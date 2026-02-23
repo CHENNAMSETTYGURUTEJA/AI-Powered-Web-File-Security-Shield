@@ -24,8 +24,8 @@ def init_db():
 def insert_log(scan_id, scan_type, target_payload, prediction, confidence):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # Format: 10:42 AM
-    timestamp = datetime.datetime.now().strftime("%I:%M %p")
+    # Store as UTC ISO 8601 string
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     cursor.execute('''
         INSERT INTO threat_logs (scan_id, timestamp, scan_type, target_payload, prediction, confidence)
         VALUES (?, ?, ?, ?, ?, ?)

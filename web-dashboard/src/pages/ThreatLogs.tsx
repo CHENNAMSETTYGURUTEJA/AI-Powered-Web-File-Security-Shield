@@ -55,6 +55,35 @@ export const ThreatLogs = () => {
         return matchesSearch && matchesType;
     });
 
+    const formatIST = (isoString: string) => {
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            return date.toLocaleTimeString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        } catch {
+            return isoString;
+        }
+    };
+
+    const getFullISTDateTime = (isoString: string) => {
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            return date.toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                dateStyle: 'medium',
+                timeStyle: 'long'
+            });
+        } catch {
+            return isoString;
+        }
+    };
+
     return (
         <div className="animate-in fade-in duration-500">
             <div className="mb-6 flex gap-4">
@@ -103,7 +132,9 @@ export const ThreatLogs = () => {
                             filteredLogs.map((log) => (
                                 <tr key={log.id} className="hover:bg-slate-800/60 transition-colors">
                                     <td className="p-4 text-slate-500 font-mono text-xs">{log.id}</td>
-                                    <td className="p-4">{log.time}</td>
+                                    <td className="p-4 text-slate-300" title={getFullISTDateTime(log.time)}>
+                                        {formatIST(log.time)}
+                                    </td>
                                     <td className="p-4">
                                         <span className="bg-slate-700/50 px-2 py-1 rounded text-xs">{log.type}</span>
                                     </td>

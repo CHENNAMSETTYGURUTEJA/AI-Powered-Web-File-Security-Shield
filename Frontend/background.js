@@ -39,7 +39,7 @@ function storeScanHistory(result) {
     history.unshift({
       url: result.url,
       isPhishing: result.isPhishing,
-      timestamp: new Date().toLocaleString(),
+      timestamp: new Date().toISOString(),
       reported: false
     });
 
@@ -375,7 +375,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
       const result = {
         url,
         isPhishing: false,
-        timestamp: new Date().toLocaleString()
+        timestamp: new Date().toISOString()
       };
 
       // Save result locally and show safe indicator
@@ -408,7 +408,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
     const result = {
       url,
       isPhishing,
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toISOString()
     };
 
     // Save result and show appropriate popup
