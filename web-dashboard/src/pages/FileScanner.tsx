@@ -46,7 +46,7 @@ export const FileScanner = () => {
         formData.append('file', file);
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/predict_file', formData, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/predict_file`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
@@ -111,8 +111,8 @@ export const FileScanner = () => {
                             onClick={handleScan}
                             disabled={isScanning}
                             className={`px-8 py-3 rounded-xl font-medium shadow-lg transition-all ${isScanning
-                                    ? 'bg-indigo-600/50 text-indigo-300 cursor-not-allowed hidden'
-                                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 hover:shadow-cyan-500/25'
+                                ? 'bg-indigo-600/50 text-indigo-300 cursor-not-allowed hidden'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 hover:shadow-cyan-500/25'
                                 }`}
                         >
                             {isScanning ? 'ANALYZING FILE...' : 'INITIATE ANALYSIS'}

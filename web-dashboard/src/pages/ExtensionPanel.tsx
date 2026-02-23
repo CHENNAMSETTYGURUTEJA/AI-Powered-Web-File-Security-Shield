@@ -15,7 +15,7 @@ export const ExtensionPanel = () => {
         const fetchStatus = async () => {
             try {
                 // Get Heartbeat
-                const statusRes = await axios.get('http://localhost:8000/api/extension-status');
+                const statusRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/extension-status`);
                 if (statusRes.data) {
                     setIsOnline(statusRes.data.is_online);
 
@@ -26,7 +26,7 @@ export const ExtensionPanel = () => {
                 }
 
                 // Get Scan Count
-                const logsRes = await axios.get('http://localhost:8000/logs');
+                const logsRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/logs`);
                 if (logsRes.data && logsRes.data.logs) {
                     const extScans = logsRes.data.logs.filter((log: any) => log.type === 'EXTENSION');
                     setTotalScans(extScans.length);

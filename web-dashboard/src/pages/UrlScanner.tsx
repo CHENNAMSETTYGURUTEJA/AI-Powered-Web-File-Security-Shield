@@ -15,7 +15,7 @@ export const UrlScanner = () => {
         setResult(null);
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/predict_url', { url });
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/predict_url`, { url });
             if (response.data.error) {
                 setError(response.data.error);
             } else {
