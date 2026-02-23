@@ -26,7 +26,7 @@ export const ExtensionPanel = () => {
                 }
 
                 // Get Scan Count
-                const logsRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/logs`);
+                const logsRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/logs`);
                 if (logsRes.data && logsRes.data.logs) {
                     const extScans = logsRes.data.logs.filter((log: any) => log.type === 'EXTENSION');
                     setTotalScans(extScans.length);

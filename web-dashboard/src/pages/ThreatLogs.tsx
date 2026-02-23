@@ -20,7 +20,7 @@ export const ThreatLogs = () => {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/logs`);
+                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/logs`);
                 if (response.data && response.data.logs) {
                     setLogs(response.data.logs);
                 }
@@ -35,7 +35,7 @@ export const ThreatLogs = () => {
 
     const handleDelete = async (id: string) => {
         try {
-            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/logs/${id}`);
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/logs/${id}`);
             // Optimistically update the UI
             setLogs(logs.filter(log => log.id !== id));
         } catch (error) {
