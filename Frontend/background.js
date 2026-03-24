@@ -641,8 +641,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Initial ping on startup (immediate)
+// Initial ping and alarm setup
 sendPing();
+
+// Create alarm for pings (exactly every 5 seconds)
+// Moving this to top level ensures it runs even after simple extension reloads
+chrome.alarms.create("extension-ping-alarm", {
+  periodInMinutes: 5 / 60 
+});
+
 
 // Listen for extension installation or update
 chrome.runtime.onInstalled.addListener(() => {

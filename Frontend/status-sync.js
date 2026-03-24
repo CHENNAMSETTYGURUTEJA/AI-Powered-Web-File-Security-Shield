@@ -36,8 +36,12 @@ function syncClientId() {
                     clientId: response.clientId
                 }, "*");
                 
+                console.log("[PhishShield] Dispatched PHISHSHIELD_SYNC event to dashboard");
+                
                 // Also store in localStorage as a fallback for the dashboard
                 localStorage.setItem('phishshield_extension_id', response.clientId);
+            } else {
+                console.warn("[PhishShield] Received empty clientId from background script");
             }
         });
     } catch (e) {
