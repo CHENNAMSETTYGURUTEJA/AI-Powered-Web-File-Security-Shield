@@ -13,7 +13,7 @@ import datetime
 import zipfile
 import io
 from url_feature_extractor import URLFeatureExtractor
-from database import init_db, insert_log, get_logs, delete_log
+from database import init_db, insert_log, get_logs, delete_log, update_heartbeat, get_heartbeat
 
 # ✅ Initialize FastAPI app
 app = FastAPI()
@@ -81,9 +81,8 @@ def verify_api_key(x_api_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return x_api_key
 
-# Global variable to track the last time each extension pinged the server
-from datetime import datetime
-client_connections: dict = {}
+# 🟢 Legacy in-memory heartbeats (replaced by DB heartbeats for production reliability)
+# client_connections = {}
 
 # ✅ Load the scaler and XGBoost model
 scaler = joblib.load("scaler.pkl")
@@ -336,8 +335,8 @@ def health_check():
 def ping_extension(api_key: str = Depends(verify_api_key), x_client_id: str = Header(None)):
     if not x_client_id:
         raise HTTPException(status_code=400, detail="Missing clientId")
-    client_connections[x_client_id] = datetime.now()
-    print(f"[DEBUG] /api/ping (POST) - Ping received for client {x_client_id} at {client_connections[x_client_id]}")
+    update_heartbeat(x_client_id)
+    # print(f"[DEBUG] /api/ping (POST) - Ping received for client {x_client_id}")
     return {"status": "ok", "message": "Heartbeat received"}
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -356,14 +355,15 @@ def ping_extension_get_or_post(request: Request, api_key: str = Depends(verify_e
     if not x_client_id:
         raise HTTPException(status_code=400, detail="Missing clientId")
     
-    client_connections[x_client_id] = datetime.now()
+    # client_connections[x_client_id] = datetime.now()
+    update_heartbeat(x_client_id)
     method = request.method
-    print(f"[DEBUG] /api/extension/ping ({method}) - Ping received for client {x_client_id} at {client_connections[x_client_id]}")
+    # print(f"[DEBUG] /api/extension/ping ({method}) - Ping received for client {x_client_id}")
     return {
         "status": "success", 
         "message": "Heartbeat updated successfully", 
         "clientId": x_client_id, 
-        "timestamp": client_connections[x_client_id].isoformat()
+        # "timestamp": datetime.now().isoformat()
     }
 
 
@@ -371,28 +371,33 @@ def ping_extension_get_or_post(request: Request, api_key: str = Depends(verify_e
 @app.get("/api/extension/status")
 def get_extension_status(clientId: str = None):
     is_online = False
+    last_ping_str = None
     
     if not clientId:
-        # If no clientId is provided, find the most recent active one as a fallback
-        if not client_connections:
-            return {"is_online": False, "last_ping": None}
-        
-        # Sort by timestamp descending
-        latest_client_id = max(client_connections, key=lambda k: client_connections[k])
-        clientId = latest_client_id
+        # Fallback to the absolute latest heartbeat in the DB
+        clientId, last_ping_str = get_heartbeat()
+    else:
+        last_ping_str = get_heartbeat(clientId)
 
-    last_ping = client_connections.get(clientId)
-    if last_ping:
-        time_diff_ms = (datetime.now() - last_ping).total_seconds() * 1000
-        # Increase buffer to 12 seconds for more stable detection over network
+    if last_ping_str:
+        # DB stores ISO 8601 strings
+        from datetime import datetime, timezone
+        last_ping = datetime.fromisoformat(last_ping_str)
+        
+        # Calculate diff (both should be UTC or naive)
+        # Our update_heartbeat uses datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        time_diff_ms = (now - last_ping).total_seconds() * 1000
+        
+        # 12 second buffer
         is_online = time_diff_ms < 12000 
         print(f"[DEBUG] /api/extension/status - Client {clientId} Time diff: {time_diff_ms:.2f} ms. Online: {is_online}")
     else:
-        print(f"[DEBUG] /api/extension/status - Client {clientId} not found. Status: OFFLINE")
+        print(f"[DEBUG] /api/extension/status - Client {clientId} not found in DB. Status: OFFLINE")
 
     return {
         "is_online": is_online,
-        "last_ping": last_ping.isoformat() if last_ping else None,
+        "last_ping": last_ping_str,
         "clientId": clientId
     }
 
@@ -425,7 +430,7 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         
         if is_hardcoded_malicious:
             # Update heartbeat on scan
-            client_connections[x_client_id] = datetime.now()
+            update_heartbeat(x_client_id)
             
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
             source = input_data.source if input_data.source != "unknown" else "extension"
@@ -439,7 +444,7 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         # 🟢 Skip if Trusted
         if extractor.is_trusted_domain():
             # Update heartbeat on scan
-            client_connections[x_client_id] = datetime.now()
+            update_heartbeat(x_client_id)
             
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
             source = input_data.source if input_data.source != "unknown" else "extension"
@@ -452,7 +457,7 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
 
         # 🧠 ML Model Processing
         # Update heartbeat on scan
-        client_connections[x_client_id] = datetime.now()
+        update_heartbeat(x_client_id)
         
         scaled_input = scaler.transform(input_df)
 
@@ -508,7 +513,7 @@ async def scan_file_extension(file: UploadFile = File(...), api_key: str = Depen
         scan_id = f"EXTF-{str(uuid.uuid4())[:6].upper()}"
         
         # Update heartbeat on scan
-        client_connections[x_client_id] = datetime.now()
+        update_heartbeat(x_client_id)
         
         # Log to database as EXTENSION
         insert_log(scan_id, "EXTENSION", filename, log_result, confidence_str, source="extension")

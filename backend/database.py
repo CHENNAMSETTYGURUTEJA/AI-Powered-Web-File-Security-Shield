@@ -19,6 +19,14 @@ def init_db():
             confidence TEXT NOT NULL
         )
     ''')
+
+    # Heartbeat table for extension status
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS extension_heartbeats (
+            client_id TEXT PRIMARY KEY,
+            last_ping TEXT NOT NULL
+        )
+    ''')
     
     # Check if 'source' column exists, if not add it (simple migration)
     cursor.execute("PRAGMA table_info(threat_logs)")
@@ -69,3 +77,32 @@ def delete_log(scan_id):
     cursor.execute('DELETE FROM threat_logs WHERE scan_id = ?', (scan_id,))
     conn.commit()
     conn.close()
+
+def update_heartbeat(client_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    cursor.execute('''
+        INSERT INTO extension_heartbeats (client_id, last_ping)
+        VALUES (?, ?)
+        ON CONFLICT(client_id) DO UPDATE SET last_ping = excluded.last_ping
+    ''', (client_id, timestamp))
+    conn.commit()
+    conn.close()
+
+def get_heartbeat(client_id=None):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    if client_id:
+        cursor.execute('SELECT last_ping FROM extension_heartbeats WHERE client_id = ?', (client_id,))
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else None
+    else:
+        # Get the most recent heartbeat from any client
+        cursor.execute('SELECT client_id, last_ping FROM extension_heartbeats ORDER BY last_ping DESC LIMIT 1')
+        result = cursor.fetchone()
+        conn.close()
+        return result if result else (None, None)
+
