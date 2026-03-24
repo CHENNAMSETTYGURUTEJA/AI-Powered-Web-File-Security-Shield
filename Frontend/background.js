@@ -609,13 +609,12 @@ async function sendPing() {
     const currentClientId = await getClientId();
     console.log(`[DEBUG] Attempting to send ping for client: ${currentClientId}`);
     
-    const response = await fetch(`${API_BASE_URL}/api/extension/ping`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/extension/ping`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
         "x-api-key": API_KEY, // Sending both for compatibility
-        "x-client-id": currentClientId
       }
     });
 

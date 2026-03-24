@@ -384,8 +384,8 @@ def get_extension_status(clientId: str = None):
     last_ping = client_connections.get(clientId)
     if last_ping:
         time_diff_ms = (datetime.now() - last_ping).total_seconds() * 1000
-        # Reduce buffer to 6 seconds for faster responsive detection
-        is_online = time_diff_ms < 6000 
+        # Increase buffer to 12 seconds for more stable detection over network
+        is_online = time_diff_ms < 12000 
         print(f"[DEBUG] /api/extension/status - Client {clientId} Time diff: {time_diff_ms:.2f} ms. Online: {is_online}")
     else:
         print(f"[DEBUG] /api/extension/status - Client {clientId} not found. Status: OFFLINE")
