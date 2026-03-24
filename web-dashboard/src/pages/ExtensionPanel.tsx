@@ -56,6 +56,7 @@ export const ExtensionPanel = () => {
 
         const handleSyncMessage = (event: MessageEvent) => {
             if (event.data && event.data.type === 'PHISHSHIELD_SYNC') {
+                console.log("[PhishShield] Received clientId from extension:", event.data.clientId);
                 currentClientId = event.data.clientId;
                 if (currentClientId) localStorage.setItem('phishshield_extension_id', currentClientId);
                 fetchStatus();

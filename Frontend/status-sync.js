@@ -57,9 +57,15 @@ function syncClientId() {
 // Sync on load
 syncClientId();
 
+// Continously re-sync every 3 seconds to ensure the dashboard picks it up 
+// even if the first event was missed (timing issues)
+setInterval(syncClientId, 3000);
+
 // Also sync when the page asks for it
 window.addEventListener("message", (event) => {
     if (event.data && event.data.type === "PHISHSHIELD_QUERY_SYNC") {
+        console.log("[PhishShield] Received sync request from dashboard");
         syncClientId();
     }
 });
+

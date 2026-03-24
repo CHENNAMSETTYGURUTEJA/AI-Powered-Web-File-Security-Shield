@@ -424,6 +424,9 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         )
         
         if is_hardcoded_malicious:
+            # Update heartbeat on scan
+            client_connections[x_client_id] = datetime.now()
+            
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
             source = input_data.source if input_data.source != "unknown" else "extension"
             insert_log(scan_id, "EXTENSION", input_data.url, "MALICIOUS", "99%", source=source)
@@ -435,6 +438,9 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
 
         # 🟢 Skip if Trusted
         if extractor.is_trusted_domain():
+            # Update heartbeat on scan
+            client_connections[x_client_id] = datetime.now()
+            
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
             source = input_data.source if input_data.source != "unknown" else "extension"
             insert_log(scan_id, "EXTENSION", input_data.url, "SAFE", "99%", source=source)
@@ -445,7 +451,11 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
             }
 
         # 🧠 ML Model Processing
+        # Update heartbeat on scan
+        client_connections[x_client_id] = datetime.now()
+        
         scaled_input = scaler.transform(input_df)
+
         dmatrix = xgb.DMatrix(scaled_input, feature_names=FEATURE_COLUMNS)
         pred = booster.predict(dmatrix)
         label = int(round(pred[0]))
@@ -496,6 +506,9 @@ async def scan_file_extension(file: UploadFile = File(...), api_key: str = Depen
 
         confidence_str = f"{int(risk_score * 100)}%" if is_malicious else f"{int((1 - risk_score) * 100)}%"
         scan_id = f"EXTF-{str(uuid.uuid4())[:6].upper()}"
+        
+        # Update heartbeat on scan
+        client_connections[x_client_id] = datetime.now()
         
         # Log to database as EXTENSION
         insert_log(scan_id, "EXTENSION", filename, log_result, confidence_str, source="extension")
