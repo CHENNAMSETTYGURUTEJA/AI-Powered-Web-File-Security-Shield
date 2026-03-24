@@ -33,24 +33,34 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Load scan history
   function loadHistory() {
-    chrome.runtime.sendMessage({ action: "getHistory" }, (history) => {
-      historyDiv.innerHTML = "";
-      history.forEach((entry) => {
-        const el = document.createElement("div");
-        el.className = `history-entry ${entry.isPhishing ? 'phishing' : 'safe'}`;
-        el.innerHTML = `
-          <div>
-            <strong>${entry.isPhishing ? '❌ Phishing' : '✅ Safe'}</strong>
-            <a href="https://safebrowsing.google.com/safebrowsing/report_phish/?url=${encodeURIComponent(entry.url)}" 
-               target="_blank" 
-               class="report-link">Report</a>
-          </div>
-          <div class="url">${entry.url}</div>
-          <div class="time">Scanned at: ${new Date(entry.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
-        `;
-        historyDiv.appendChild(el);
+    try {
+      chrome.runtime.sendMessage({ action: "getHistory" }, (history) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Could not load history:", chrome.runtime.lastError.message);
+          return;
+        }
+        if (!history) return;
+        
+        historyDiv.innerHTML = "";
+        history.forEach((entry) => {
+          const el = document.createElement("div");
+          el.className = `history-entry ${entry.isPhishing ? 'phishing' : 'safe'}`;
+          el.innerHTML = `
+            <div>
+              <strong>${entry.isPhishing ? '❌ Phishing' : '✅ Safe'}</strong>
+              <a href="https://safebrowsing.google.com/safebrowsing/report_phish/?url=${encodeURIComponent(entry.url)}" 
+                 target="_blank" 
+                 class="report-link">Report</a>
+            </div>
+            <div class="url">${entry.url}</div>
+            <div class="time">Scanned at: ${new Date(entry.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+          `;
+          historyDiv.appendChild(el);
+        });
       });
-    });
+    } catch (e) {
+      console.error("Error in loadHistory:", e);
+    }
   }
 
   // Initial history load
@@ -82,10 +92,14 @@ document.addEventListener("DOMContentLoaded", function () {
       formData.append("file", file);
 
       try {
-        const response = await fetch("https://phishshield-backend.onrender.com/api/scan-file", {
+        const { clientId } = await new Promise(res => chrome.storage.local.get(['clientId'], res));
+        const currentClientId = clientId || "ext_unknown";
+
+        const response = await fetch("http://localhost:8000/api/scan-file", {
           method: "POST",
           headers: {
-            "x-api-key": "phishshield-ext-key-2026"
+            "x-api-key": "phishshield-ext-key-2026",
+            "x-client-id": currentClientId
             // Note: Don't set Content-Type manually when using FormData
           },
           body: formData,

@@ -1,10 +1,47 @@
+// PhishShield - Senior Browser Extension Engineer Fixes
+// Properly declare tabStates and persist it using globalThis for stability within the worker scope
+globalThis.tabStates = globalThis.tabStates || {};
+
+// Global Error Handling to prevent unhandled promise rejections and crashes
+self.addEventListener("unhandledrejection", (event) => {
+  console.error("[PhishShield] Unhandled Promise Rejection:", event.reason);
+});
+
+self.addEventListener("error", (event) => {
+  console.error("[PhishShield] Global Service Worker Error:", event.message);
+});
+
 // --- Configuration ---
 // Change to your deployed Render URL for production
-const API_BASE_URL = "https://phishshield-backend.onrender.com";
+const API_BASE_URL = "http://localhost:8000";
 const API_KEY = "phishshield-ext-key-2026";
+
+// --- Client ID Management ---
+let clientId = null;
+
+async function getClientId() {
+  if (clientId) return clientId;
+  
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['clientId'], (result) => {
+      if (result.clientId) {
+        clientId = result.clientId;
+      } else {
+        // Generate new UUID
+        clientId = 'ext_' + self.crypto.randomUUID();
+        chrome.storage.local.set({ clientId: clientId });
+      }
+      resolve(clientId);
+    });
+  });
+}
 
 // --- Utility: Fetch with Retry for Render Cold Starts ---
 async function fetchWithRetry(url, options, maxRetries = 3) {
+  const currentClientId = await getClientId();
+  options.headers = options.headers || {};
+  options.headers['x-client-id'] = currentClientId;
+
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await fetch(url, options);
@@ -19,8 +56,53 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
   }
 }
 
-// Store information about each tab's state
-const tabStates = new Map(); // { tabId: { domain: string, previousUrl: string } }
+// Store information about each tab's state in session storage (MV3 best practice)
+async function getTabState(tabId) {
+  // Check globalThis first for instant availability, then fallback to session storage
+  if (globalThis.tabStates[`tab_${tabId}`]) {
+    return globalThis.tabStates[`tab_${tabId}`];
+  }
+  
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.session.get([`tab_${tabId}`], (result) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        const state = result[`tab_${tabId}`] || null;
+        if (state) globalThis.tabStates[`tab_${tabId}`] = state; // Sync back to globalThis
+        resolve(state);
+      });
+    } catch (e) {
+      console.error("[PhishShield] Error getting tab state:", e);
+      resolve(null);
+    }
+  });
+}
+
+async function setTabState(tabId, state) {
+  try {
+    globalThis.tabStates[`tab_${tabId}`] = state; // Persist in globalThis
+    return chrome.storage.session.set({ [`tab_${tabId}`]: state });
+  } catch (e) {
+    console.error("[PhishShield] Error setting tab state:", e);
+  }
+}
+
+async function deleteTabState(tabId) {
+  try {
+    delete globalThis.tabStates[`tab_${tabId}`]; // Remove from globalThis
+    return chrome.storage.session.remove([`tab_${tabId}`]);
+  } catch (e) {
+    console.error("[PhishShield] Error deleting tab state:", e);
+  }
+}
+
+async function clearAllTabStates() {
+  globalThis.tabStates = {}; // Clear globalThis state as well
+  return chrome.storage.session.clear();
+}
 const MAX_HISTORY_ITEMS = 10; // Maximum number of scan history items to keep
 
 // Get the domain name from a URL
@@ -124,7 +206,7 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
         });
       },
       args: [popupHTML]
-    });
+    }).catch(err => console.warn("[PhishShield] Could not inject warning popup:", err.message));
   } else if (isSamePage) {
     // Create and show same page indicator
     const samePageHTML = `
@@ -193,7 +275,7 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
         }, 5000);
       },
       args: [samePageHTML]
-    });
+    }).catch(err => console.warn("[PhishShield] Could not inject same-page indicator:", err.message));
   } else {
     // Create and show safe URL indicator
     const tickHTML = `
@@ -276,7 +358,7 @@ function injectPopup(tabId, url, isPhishing, isSamePage = false) {
         }, 5000);
       },
       args: [tickHTML]
-    });
+    }).catch(err => console.warn("[PhishShield] Could not inject safe indicator:", err.message));
   }
 }
 
@@ -294,7 +376,8 @@ async function checkForPhishing(url, tabId, isReload = false) {
       return;
     }
 
-    const tabState = tabStates.get(tabId);
+    // Get tab state from async storage
+    const tabState = await getTabState(tabId);
 
     // ===================================================
     // SAME DOMAIN CHECK LOGIC
@@ -319,7 +402,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
         }
 
         // Update tab state
-        tabStates.set(tabId, {
+        await setTabState(tabId, {
           domain: domain,
           previousUrl: url
         });
@@ -369,7 +452,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
           "Content-Type": "application/json",
           "x-api-key": API_KEY
         },
-        body: JSON.stringify({ url: url }),
+        body: JSON.stringify({ url: url, source: "extension" }),
       }).catch(err => console.error("Failed to log trusted domain:", err));
 
       const result = {
@@ -392,14 +475,14 @@ async function checkForPhishing(url, tabId, isReload = false) {
         "Content-Type": "application/json",
         "x-api-key": API_KEY
       },
-      body: JSON.stringify({ url: url }),
+      body: JSON.stringify({ url: url, source: "extension" }),
     });
 
     const data = await response.json();
     const isPhishing = data.isPhishing;
 
     // Update tab information
-    tabStates.set(tabId, {
+    await setTabState(tabId, {
       domain: domain,
       previousUrl: url
     });
@@ -417,7 +500,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
 
     return result;
   } catch (error) {
-    console.error("Scan error:", error);
+    console.error(`[PhishShield] Scan error for ${url}:`, error);
     return { error: error.message };
   }
 }
@@ -449,7 +532,7 @@ chrome.webNavigation.onCommitted.addListener((details) => {
 // Watch for when user switches to a different tab
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (tab.url) {
+    if (tab && tab.url) {
       debouncedCheck(tab.url, activeInfo.tabId, false);
     }
   });
@@ -457,46 +540,124 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 
 // Clean up when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  tabStates.delete(tabId);
+  deleteTabState(tabId).catch(err => console.error("Error deleting tab state:", err));
 });
 
 // Handle messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "getCurrentStatus") {
-    // Send current URL status to popup
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      const url = tabs[0].url;
-      const result = await checkForPhishing(url, tabs[0].id, false);
-      sendResponse(result);
-    });
-    return true;
-  } else if (request.action === "getHistory") {
-    // Send scan history to popup
-    chrome.storage.local.get(["scanHistory"], (res) => {
-      sendResponse(res.scanHistory || []);
-    });
-    return true;
+  try {
+    if (request.action === "getCurrentStatus") {
+      // Send current URL status to popup
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        try {
+          if (tabs[0] && tabs[0].url) {
+            const url = tabs[0].url;
+            const result = await checkForPhishing(url, tabs[0].id, false);
+            sendResponse(result);
+          } else {
+            sendResponse({ error: "No active tab found" });
+          }
+        } catch (innerError) {
+          console.error("[PhishShield] Error in getCurrentStatus query:", innerError);
+          sendResponse({ error: innerError.message });
+        }
+      });
+      return true;
+    } else if (request.action === "getHistory") {
+      // Send scan history to popup
+      chrome.storage.local.get(["scanHistory"], (res) => {
+        sendResponse(res.scanHistory || []);
+      });
+      return true;
+    } else if (request.action === "getClientId") {
+      // Send clientId to content script
+      getClientId().then(id => {
+        sendResponse({ clientId: id });
+      }).catch(err => {
+        console.error("[PhishShield] Error getting clientId:", err);
+        sendResponse({ error: err.message });
+      });
+      return true;
+    }
+  } catch (outerError) {
+    console.error("[PhishShield] Error in onMessage listener:", outerError);
+    sendResponse({ error: outerError.message });
   }
 });
 
-// Clean up tab states every 30 minutes
-setInterval(() => {
-  tabStates.clear();
-}, 30 * 60 * 1000);
+// Listen for cleanup alarm
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "cleanup-tab-states-alarm") {
+    console.log("[DEBUG] Periodic cleanup of tab states");
+    clearAllTabStates().catch(err => console.error("Error clearing tab states:", err));
+  }
+});
 
-// Heartbeat Ping to Backend Every 30 seconds
-setInterval(async () => {
+// --- Heartbeat Logic Using chrome.alarms ---
+
+async function sendPing() {
   try {
-    await fetch(`${API_BASE_URL}/api/ping`, {
+    const currentClientId = await getClientId();
+    console.log(`[DEBUG] Attempting to send ping for client: ${currentClientId}`);
+    
+    const response = await fetch(`${API_BASE_URL}/api/extension/ping`, {
       method: "POST",
       headers: {
-        "x-api-key": API_KEY
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY, // Sending both for compatibility
+        "x-client-id": currentClientId
       }
     });
-  } catch (e) {
-    console.error("Heartbeat ping failed:", e);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`[DEBUG] Ping successful:`, data);
+    } else {
+      const errorText = await response.text();
+      console.error(`[DEBUG] Ping failed with status ${response.status}: ${errorText}`);
+      // Simple retry logic: if it's a transient error, the next alarm will handle it.
+      // We could add more immediate retry here if needed.
+    }
+  } catch (error) {
+    console.error(`[DEBUG] Error sending ping:`, error.message);
   }
-}, 30 * 1000);
+}
+
+// Heartbeat Logic - No need to call create here, moved to onInstalled
+
+// Listen for alarms
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "extension-ping-alarm") {
+    sendPing();
+  }
+});
+
+// Initial ping on startup (immediate)
+sendPing();
+
+// Listen for extension installation or update
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("[DEBUG] Extension installed/updated - initializing alarms");
+  
+  // Create alarm for pings (exactly every 5 seconds)
+  chrome.alarms.create("extension-ping-alarm", {
+    periodInMinutes: 5 / 60 
+  });
+
+  // Create alarm for cleanup (every 30 minutes)
+  chrome.alarms.create("cleanup-tab-states-alarm", {
+    periodInMinutes: 30
+  });
+
+  sendPing();
+});
+
+// Listen for browser startup
+chrome.runtime.onStartup.addListener(() => {
+  console.log("[DEBUG] Browser started - sending immediate ping");
+  sendPing();
+});
 
 // Log when the extension starts
-console.log("Phishing Detector background script started"); 
+console.log("Phishing Detector background script initialized with Alarm API"); 

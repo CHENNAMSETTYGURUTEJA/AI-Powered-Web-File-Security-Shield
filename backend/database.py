@@ -7,6 +7,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'logs.db')
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # Initial table creation
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS threat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,18 +19,26 @@ def init_db():
             confidence TEXT NOT NULL
         )
     ''')
+    
+    # Check if 'source' column exists, if not add it (simple migration)
+    cursor.execute("PRAGMA table_info(threat_logs)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'source' not in columns:
+        print("[DB] Migrating database: adding 'source' column")
+        cursor.execute("ALTER TABLE threat_logs ADD COLUMN source TEXT DEFAULT 'unknown'")
+    
     conn.commit()
     conn.close()
 
-def insert_log(scan_id, scan_type, target_payload, prediction, confidence):
+def insert_log(scan_id, scan_type, target_payload, prediction, confidence, source="unknown"):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     # Store as UTC ISO 8601 string
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     cursor.execute('''
-        INSERT INTO threat_logs (scan_id, timestamp, scan_type, target_payload, prediction, confidence)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (scan_id, timestamp, scan_type, target_payload, prediction, confidence))
+        INSERT INTO threat_logs (scan_id, timestamp, scan_type, target_payload, prediction, confidence, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (scan_id, timestamp, scan_type, target_payload, prediction, confidence, source))
     conn.commit()
     conn.close()
 
@@ -49,7 +58,8 @@ def get_logs():
             "type": row["scan_type"],
             "target": row["target_payload"],
             "result": row["prediction"],
-            "confidence": row["confidence"]
+            "confidence": row["confidence"],
+            "source": row["source"] if "source" in row.keys() else "unknown"
         })
     return logs
 

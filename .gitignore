@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.db
+*.pyc
+.env
+dist/
+.vscode/
+.idea/
+*.log

@@ -1,22 +1,24 @@
-# ✅ Import required libraries
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel
 import joblib
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 import uuid
-from url_feature_extractor import URLFeatureExtractor  # Custom class to extract features from a raw URL
+import os
+import time
+import datetime
+import zipfile
+import io
+from url_feature_extractor import URLFeatureExtractor
 from database import init_db, insert_log, get_logs, delete_log
 
 # ✅ Initialize FastAPI app
 app = FastAPI()
 
-# ✅ Initialize Database
-init_db()
-
-# ✅ Enable CORS (Cross-Origin Resource Sharing) to allow frontend to access backend
+# ✅ Enable CORS (Cross-Origin Resource Sharing)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,8 +27,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import time
-from fastapi import Request
+# ✅ Initialize Database
+init_db()
+
+@app.get("/api/extension/download")
+async def download_extension():
+    """
+    Dynamically packages the 'Frontend' folder into a ZIP and serves it.
+    """
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        frontend_path = os.path.abspath(os.path.join(base_dir, '..', 'Frontend'))
+        
+        if not os.path.exists(frontend_path):
+            raise HTTPException(status_code=404, detail="Extension folder not found")
+
+        # Create ZIP in memory using NO COMPRESSION (ZIP_STORED) for maximum compatibility
+        zip_io = io.BytesIO()
+        with zipfile.ZipFile(zip_io, 'w', zipfile.ZIP_STORED) as zip_file:
+            for root, dirs, files in os.walk(frontend_path):
+                if 'node_modules' in dirs: dirs.remove('node_modules')
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, frontend_path)
+                    zip_file.write(file_path, arcname)
+        
+        return Response(
+            content=zip_io.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=PhishShield-Extension.zip"}
+        )
+    except Exception as e:
+        print(f"[ERROR] ZIP failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ✅ Centralized request logging middleware for debugging
 
 # ✅ Centralized request logging middleware for debugging
 @app.middleware("http")
@@ -45,9 +81,9 @@ def verify_api_key(x_api_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return x_api_key
 
-# Global variable to track the last time the extension pinged the server
+# Global variable to track the last time each extension pinged the server
 from datetime import datetime
-last_extension_ping: datetime = None
+client_connections: dict = {}
 
 # ✅ Load the scaler and XGBoost model
 scaler = joblib.load("scaler.pkl")
@@ -91,6 +127,7 @@ class URLFeatures(BaseModel):
 # ✅ Define input model for raw URL input
 class URLInput(BaseModel):
     url: str
+    source: str = "unknown"
 
 # ✅ Predict directly from structured features
 @app.post("/predict")
@@ -153,7 +190,8 @@ def predict_from_url(input_data: URLInput):
         
         if is_hardcoded_malicious:
             scan_id = f"URL-{str(uuid.uuid4())[:6].upper()}"
-            insert_log(scan_id, "URL", input_data.url, "MALICIOUS", "99%")
+            source = input_data.source if input_data.source != "unknown" else "dashboard"
+            insert_log(scan_id, "URL", input_data.url, "MALICIOUS", "99%", source=source)
             return {
                 "features": features,
                 "prediction": 1,
@@ -164,7 +202,8 @@ def predict_from_url(input_data: URLInput):
         # 🟢 Skip model processing completely if domain is widely trusted but blocking scraper
         if extractor.is_trusted_domain():
             scan_id = f"URL-{str(uuid.uuid4())[:6].upper()}"
-            insert_log(scan_id, "URL", input_data.url, "SAFE", "99%")
+            source = input_data.source if input_data.source != "unknown" else "dashboard"
+            insert_log(scan_id, "URL", input_data.url, "SAFE", "99%", source=source)
             return {
                 "features": features,
                 "prediction": 0,
@@ -186,7 +225,9 @@ def predict_from_url(input_data: URLInput):
         confidence_str = f"{int(risk_score * 100)}%" if label == 1 else f"{int((1 - risk_score) * 100)}%"
         
         scan_id = f"URL-{str(uuid.uuid4())[:6].upper()}"
-        insert_log(scan_id, "URL", input_data.url, log_result, confidence_str)
+        # Dashboard URL scanner uses /predict_url, source should be "dashboard"
+        source = input_data.source if input_data.source != "unknown" else "dashboard"
+        insert_log(scan_id, "URL", input_data.url, log_result, confidence_str, source=source)
 
         return {
             "features": features,
@@ -243,7 +284,8 @@ async def predict_file(file: UploadFile = File(...)):
 
         confidence_str = f"{int(risk_score * 100)}%" if is_malicious else f"{int((1 - risk_score) * 100)}%"
         scan_id = f"FILE-{str(uuid.uuid4())[:6].upper()}"
-        insert_log(scan_id, "FILE", filename, log_result, confidence_str)
+        # Dedicated File scanner uses /predict_file, source should be "file"
+        insert_log(scan_id, "FILE", filename, log_result, confidence_str, source="file")
 
         return {
             "filename": filename,
@@ -291,29 +333,74 @@ def health_check():
 
 # ✅ Extension Ping (Heartbeat)
 @app.post("/api/ping")
-def ping_extension(api_key: str = Depends(verify_api_key)):
-    global last_extension_ping
-    last_extension_ping = datetime.now()
+def ping_extension(api_key: str = Depends(verify_api_key), x_client_id: str = Header(None)):
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing clientId")
+    client_connections[x_client_id] = datetime.now()
+    print(f"[DEBUG] /api/ping (POST) - Ping received for client {x_client_id} at {client_connections[x_client_id]}")
     return {"status": "ok", "message": "Heartbeat received"}
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
+
+bearer_scheme = HTTPBearer()
+
+def verify_extension_bearer(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
+    if credentials.credentials != EXTENSION_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return credentials.credentials
+
+@app.get("/api/extension/ping")
+@app.post("/api/extension/ping")
+def ping_extension_get_or_post(request: Request, api_key: str = Depends(verify_extension_bearer), x_client_id: str = Header(None)):
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing clientId")
+    
+    client_connections[x_client_id] = datetime.now()
+    method = request.method
+    print(f"[DEBUG] /api/extension/ping ({method}) - Ping received for client {x_client_id} at {client_connections[x_client_id]}")
+    return {
+        "status": "success", 
+        "message": "Heartbeat updated successfully", 
+        "clientId": x_client_id, 
+        "timestamp": client_connections[x_client_id].isoformat()
+    }
+
+
 # ✅ Get Extension Status (for Web Dashboard)
-@app.get("/api/extension-status")
-def get_extension_status():
-    global last_extension_ping
+@app.get("/api/extension/status")
+def get_extension_status(clientId: str = None):
     is_online = False
-    if last_extension_ping:
-        # If pinged within the last 60 seconds, consider it online
-        time_diff = (datetime.now() - last_extension_ping).total_seconds()
-        is_online = time_diff < 60
+    
+    if not clientId:
+        # If no clientId is provided, find the most recent active one as a fallback
+        if not client_connections:
+            return {"is_online": False, "last_ping": None}
         
+        # Sort by timestamp descending
+        latest_client_id = max(client_connections, key=lambda k: client_connections[k])
+        clientId = latest_client_id
+
+    last_ping = client_connections.get(clientId)
+    if last_ping:
+        time_diff_ms = (datetime.now() - last_ping).total_seconds() * 1000
+        # Reduce buffer to 6 seconds for faster responsive detection
+        is_online = time_diff_ms < 6000 
+        print(f"[DEBUG] /api/extension/status - Client {clientId} Time diff: {time_diff_ms:.2f} ms. Online: {is_online}")
+    else:
+        print(f"[DEBUG] /api/extension/status - Client {clientId} not found. Status: OFFLINE")
+
     return {
         "is_online": is_online,
-        "last_ping": last_extension_ping.isoformat() if last_extension_ping else None
+        "last_ping": last_ping.isoformat() if last_ping else None,
+        "clientId": clientId
     }
 
 # ✅ Dedicated Extension Scan URL Endpoint
 @app.post("/api/scan-url")
-def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_key)):
+def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_key), x_client_id: str = Header(None)):
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing clientId")
     try:
         extractor = URLFeatureExtractor(input_data.url)
         features = extractor.extract_model_features()
@@ -338,7 +425,8 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         
         if is_hardcoded_malicious:
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
-            insert_log(scan_id, "EXTENSION", input_data.url, "MALICIOUS", "99%")
+            source = input_data.source if input_data.source != "unknown" else "extension"
+            insert_log(scan_id, "EXTENSION", input_data.url, "MALICIOUS", "99%", source=source)
             return {
                 "url": input_data.url,
                 "isPhishing": True,
@@ -348,7 +436,8 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         # 🟢 Skip if Trusted
         if extractor.is_trusted_domain():
             scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
-            insert_log(scan_id, "EXTENSION", input_data.url, "SAFE", "99%")
+            source = input_data.source if input_data.source != "unknown" else "extension"
+            insert_log(scan_id, "EXTENSION", input_data.url, "SAFE", "99%", source=source)
             return {
                 "url": input_data.url,
                 "isPhishing": False,
@@ -366,7 +455,9 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         confidence_str = f"{int(risk_score * 100)}%" if label == 1 else f"{int((1 - risk_score) * 100)}%"
         
         scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
-        insert_log(scan_id, "EXTENSION", input_data.url, log_result, confidence_str)
+        # Extension endpoint, use "extension" source unless overridden
+        source = input_data.source if input_data.source != "unknown" else "extension"
+        insert_log(scan_id, "EXTENSION", input_data.url, log_result, confidence_str, source=source)
 
         return {
             "url": input_data.url,
@@ -376,9 +467,12 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ✅ Dedicated Extension Scan File Endpoint
 @app.post("/api/scan-file")
-async def scan_file_extension(file: UploadFile = File(...), api_key: str = Depends(verify_api_key)):
+async def scan_file_extension(file: UploadFile = File(...), api_key: str = Depends(verify_api_key), x_client_id: str = Header(None)):
+    if not x_client_id:
+        raise HTTPException(status_code=400, detail="Missing clientId")
     try:
         content = await file.read()
         filename = file.filename or "unknown_file"
@@ -404,7 +498,7 @@ async def scan_file_extension(file: UploadFile = File(...), api_key: str = Depen
         scan_id = f"EXTF-{str(uuid.uuid4())[:6].upper()}"
         
         # Log to database as EXTENSION
-        insert_log(scan_id, "EXTENSION", filename, log_result, confidence_str)
+        insert_log(scan_id, "EXTENSION", filename, log_result, confidence_str, source="extension")
 
         return {
             "filename": filename,

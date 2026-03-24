@@ -38,6 +38,10 @@ export const Dashboard = () => {
                         <FileSearch className="w-5 h-5 text-indigo-400" />
                         Upload File to Sandbox
                     </Link>
+                    <Link to="/extension" className="group flex items-center justify-center gap-2 px-8 py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-white font-medium rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:-translate-y-1">
+                        <Layers className="w-5 h-5 text-emerald-400" />
+                        Extension Panel
+                    </Link>
                 </div>
             </section>
 
