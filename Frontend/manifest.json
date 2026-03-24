@@ -26,6 +26,7 @@
   "host_permissions": [
     "<all_urls>",
     "https://phishshield-api.onrender.com/*",
+    "https://ai-powered-web-file-security-shield.vercel.app/*",
     "http://localhost:8000/*",
     "http://localhost:5173/*"
   ],

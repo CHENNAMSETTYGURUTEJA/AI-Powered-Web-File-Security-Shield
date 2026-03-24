@@ -11,9 +11,19 @@ self.addEventListener("error", (event) => {
   console.error("[PhishShield] Global Service Worker Error:", event.message);
 });
 
-// Change to your deployed Render URL for production
-const API_BASE_URL = "https://phishshield-api.onrender.com";
+// --- CONFIGURATION ---
+// Set to false for production, true for local development
+const DEV_MODE = false; 
+
+const API_BASE_URL = DEV_MODE 
+  ? "http://localhost:8000" 
+  : "https://phishshield-api.onrender.com";
+
 const API_KEY = "phishshield-ext-key-2026";
+
+console.log(`[PhishShield] Initialized in ${DEV_MODE ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+console.log(`[PhishShield] API Base URL: ${API_BASE_URL}`);
+
 
 // --- Client ID Management ---
 let clientId = null;
@@ -611,7 +621,7 @@ async function sendPing() {
 
     if (response.ok) {
       const data = await response.json();
-      console.log(`[DEBUG] Ping successful:`, data);
+      console.log(`[PhishShield] Ping SUCCESS:`, data);
     } else {
       const errorText = await response.text();
       console.error(`[DEBUG] Ping failed with status ${response.status}: ${errorText}`);
@@ -619,7 +629,7 @@ async function sendPing() {
       // We could add more immediate retry here if needed.
     }
   } catch (error) {
-    console.error(`[DEBUG] Error sending ping:`, error.message);
+    console.error(`[PhishShield] Ping ERROR:`, error.message);
   }
 }
 

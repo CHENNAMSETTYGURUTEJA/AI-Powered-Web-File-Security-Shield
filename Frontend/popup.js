@@ -95,7 +95,13 @@ document.addEventListener("DOMContentLoaded", function () {
         const { clientId } = await new Promise(res => chrome.storage.local.get(['clientId'], res));
         const currentClientId = clientId || "ext_unknown";
 
-        const response = await fetch("https://phishshield-api.onrender.com/api/scan-file", {
+        // Dynamic API switching
+        const DEV_MODE = false; 
+        const BASE_URL = DEV_MODE 
+          ? "http://localhost:8000" 
+          : "https://phishshield-api.onrender.com";
+
+        const response = await fetch(`${BASE_URL}/api/scan-file`, {
           method: "POST",
           headers: {
             "x-api-key": "phishshield-ext-key-2026",
