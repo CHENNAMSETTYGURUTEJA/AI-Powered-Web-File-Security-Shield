@@ -11,9 +11,8 @@ self.addEventListener("error", (event) => {
   console.error("[PhishShield] Global Service Worker Error:", event.message);
 });
 
-// --- Configuration ---
 // Change to your deployed Render URL for production
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://phishshield-api.onrender.com";
 const API_KEY = "phishshield-ext-key-2026";
 
 // --- Client ID Management ---

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
@@ -15,7 +15,7 @@ export const UrlScanner = () => {
         setResult(null);
 
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/predict_url`, { 
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/predict_url`, { 
                 url, 
                 source: 'dashboard' 
             });

@@ -47,7 +47,7 @@ export const FileScanner = () => {
         formData.append('source', 'file');
 
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/predict_file`, formData, {
+            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/predict_file`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 

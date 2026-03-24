@@ -34,7 +34,7 @@ export const ExtensionPanel = () => {
 
         const fetchStatus = async () => {
             try {
-                const statusRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/extension/status?clientId=${currentClientId || ''}`);
+                const statusRes = await axios.get(`${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/api/extension/status?clientId=${currentClientId || ''}`);
                 if (statusRes.data) {
                     setIsOnline(statusRes.data.is_online);
                     if (!currentClientId && statusRes.data.clientId) {
@@ -103,7 +103,7 @@ export const ExtensionPanel = () => {
 
     const handleDownload = () => {
         setIsDownloading(true);
-        const downloadUrl = `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api/extension/download`;
+        const downloadUrl = `${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/api/extension/download`;
         window.location.href = downloadUrl;
         setTimeout(() => setIsDownloading(false), 2000);
     };

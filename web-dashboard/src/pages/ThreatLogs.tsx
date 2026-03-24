@@ -21,7 +21,7 @@ export const ThreatLogs = () => {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/logs`);
+                const response = await axios.get(`${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/api/logs`);
                 if (response.data && response.data.logs) {
                     setLogs(response.data.logs);
                 }
@@ -40,7 +40,7 @@ export const ThreatLogs = () => {
         }
 
         try {
-            await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/logs/${id}`);
+            await axios.delete(`${import.meta.env.VITE_API_URL || 'https://phishshield-api.onrender.com'}/api/logs/${id}`);
             // Optimistically update the UI
             setLogs(logs.filter(log => log.id !== id));
             
