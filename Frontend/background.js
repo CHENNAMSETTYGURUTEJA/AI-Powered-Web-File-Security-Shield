@@ -451,7 +451,12 @@ async function checkForPhishing(url, tabId, isReload = false) {
       'mozilla.org',
       'apple.com',
       'adobe.com',
-      'cloudflare.com'
+      'cloudflare.com',
+      'vercel.com',
+      'vercel.app',
+      'render.com',
+      'onrender.com',
+      'localhost'
     ];
 
     // If domain is trusted locally, we still want it logged in the backend dashboard

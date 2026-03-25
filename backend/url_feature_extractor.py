@@ -159,7 +159,7 @@ class URLFeatureExtractor:
             'github.com', 'microsoft.com', 'apple.com', 'amazon.com', 
             'netflix.com', 'wikipedia.org', 'reddit.com', 'stackoverflow.com', 
             'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
-            'vercel.app', 'render.com', 'onrender.com', 'localhost'
+            'vercel.com', 'vercel.app', 'render.com', 'onrender.com', 'localhost'
         ]
         
         domain = self.domain.lower()
