@@ -153,14 +153,29 @@ class URLFeatureExtractor:
         return 1 if len(self.response.history)>0 else -1
 
     def is_trusted_domain(self):
-        # Fallback for sites that block scraping like ChatGPT, Google, Cloudflare protected sites
-        trusted = [
-            'google.com', 'chatgpt.com', 'openai.com', 'youtube.com', 'facebook.com', 
-            'twitter.com', 'instagram.com', 'linkedin.com', 'github.com', 'microsoft.com',
-            'apple.com', 'amazon.com', 'netflix.com', 'wikipedia.org', 'reddit.com',
-            'stackoverflow.com', 'yahoo.com', 'bing.com', 'whatsapp.com', 'zoom.us'
+        # List of high-reputation domains that should never be flagged as phishing
+        trusted_suffixes = [
+            'google.com', 'youtube.com', 'chatgpt.com', 'openai.com', 
+            'github.com', 'microsoft.com', 'apple.com', 'amazon.com', 
+            'netflix.com', 'wikipedia.org', 'reddit.com', 'stackoverflow.com', 
+            'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
+            'vercel.app', 'render.com', 'onrender.com', 'localhost'
         ]
-        return any(self.domain.endswith(t) for t in trusted)
+        
+        domain = self.domain.lower()
+        if not domain:
+            return False
+            
+        # Exact match for localhost or domains without subdomains
+        if domain in trusted_suffixes:
+            return True
+            
+        # Match subdomains (e.g., project.vercel.app matches vercel.app)
+        for suffix in trusted_suffixes:
+            if domain.endswith('.' + suffix):
+                return True
+                
+        return False
 
 
     def extract_model_features(self):

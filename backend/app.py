@@ -148,11 +148,13 @@ def predict(features: URLFeatures):
 
         # Predict
         pred = booster.predict(dmatrix)
-        label = int(round(pred[0]))
+        risk_score = float(pred[0])
+        label = 1 if risk_score >= 0.85 else 0
 
         return {
             "prediction": label,
-            "result": "Legitimate" if label == 1 else "Phishing"
+            "result": "Legitimate" if label == 0 else "Phishing",
+            "risk_score": risk_score
         }
     except Exception as e:
         return {"error": str(e)}
@@ -215,17 +217,17 @@ def predict_from_url(input_data: URLInput):
                 "risk_score": 0.012
             }
 
-        # Scale
+        # 🧠 ML Model Processing
         scaled_input = scaler.transform(input_df)
-
-        # Predict with DMatrix
         dmatrix = xgb.DMatrix(scaled_input, feature_names=FEATURE_COLUMNS)
         pred = booster.predict(dmatrix)
-        label = int(round(pred[0]))
         risk_score = float(pred[0])
         
+        # 🛡️ SAFETY THRESHOLD: Confidence must be >= 85% to be MALICIOUS
+        label = 1 if risk_score >= 0.85 else 0
+        
         result_str = "Legitimate" if label == 0 else "Phishing"
-        log_result = "SAFE" if label == 0 else ("SUSPICIOUS" if risk_score > 0.4 and risk_score < 0.8 else "MALICIOUS")
+        log_result = "SAFE" if label == 0 else ("SUSPICIOUS" if risk_score < 0.95 else "MALICIOUS")
         confidence_str = f"{int(risk_score * 100)}%" if label == 1 else f"{int((1 - risk_score) * 100)}%"
         
         scan_id = f"URL-{str(uuid.uuid4())[:6].upper()}"
@@ -452,10 +454,12 @@ def scan_url_extension(input_data: URLInput, api_key: str = Depends(verify_api_k
         scaled_input = scaler.transform(input_df)
         dmatrix = xgb.DMatrix(scaled_input, feature_names=FEATURE_COLUMNS)
         pred = booster.predict(dmatrix)
-        label = int(round(pred[0]))
         risk_score = float(pred[0])
         
-        log_result = "SAFE" if label == 0 else ("SUSPICIOUS" if risk_score > 0.4 and risk_score < 0.8 else "MALICIOUS")
+        # 🛡️ SAFETY THRESHOLD: Confidence must be >= 85% to be MALICIOUS
+        label = 1 if risk_score >= 0.85 else 0
+        
+        log_result = "SAFE" if label == 0 else ("SUSPICIOUS" if risk_score < 0.95 else "MALICIOUS")
         confidence_str = f"{int(risk_score * 100)}%" if label == 1 else f"{int((1 - risk_score) * 100)}%"
         
         scan_id = f"EXT-{str(uuid.uuid4())[:6].upper()}"
