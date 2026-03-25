@@ -23,7 +23,8 @@ app.add_middleware(
     CORSMiddleware,
     # Allow all origins for dashboard (localhost/vercel) AND Chrome Extension in production
     allow_origins=["*"],
-    allow_credentials=True,
+    # Must be False if allow_origins is ["*"]
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     # Explicitly expose headers if needed
