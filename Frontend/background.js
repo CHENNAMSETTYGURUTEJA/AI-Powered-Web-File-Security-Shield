@@ -19,10 +19,11 @@ const LOCAL_API_URL = "http://localhost:8000";
 let API_BASE_URL = PRODUCTION_API_URL; 
 const API_KEY = "phishshield-ext-key-2026";
 
-// Initialize config from storage
+// Initialize config from storage and sanitize
 chrome.storage.local.get(['apiUrl'], (result) => {
   if (result.apiUrl) {
-    API_BASE_URL = result.apiUrl;
+    // Remove any trailing slashes for consistency
+    API_BASE_URL = result.apiUrl.replace(/\/+$/, "");
     console.log(`[CONFIG] Loaded API_BASE_URL from storage: ${API_BASE_URL}`);
   }
 });
@@ -511,7 +512,7 @@ async function checkForPhishing(url, tabId, isReload = false) {
 
     return result;
   } catch (error) {
-    console.error(`[PhishShield] Scan error for ${url}:`, error);
+    console.error(`[PhishShield] Scan error at ${API_BASE_URL}/api/scan-url for ${url}:`, error.name, error.message);
     return { error: error.message };
   }
 }
@@ -592,7 +593,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === "updateConfig") {
       // Update endpoint URL from dashboard sync
       if (request.apiUrl && request.apiUrl !== API_BASE_URL) {
-        API_BASE_URL = request.apiUrl;
+        // Remove trailing slashes
+        const cleanUrl = request.apiUrl.replace(/\/+$/, "");
+        API_BASE_URL = cleanUrl;
         chrome.storage.local.set({ apiUrl: API_BASE_URL });
         console.log(`[CONFIG] API_BASE_URL updated to: ${API_BASE_URL}`);
         sendPing(); // Immediate ping with new URL
