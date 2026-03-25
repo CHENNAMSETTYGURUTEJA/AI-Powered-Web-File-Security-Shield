@@ -12,9 +12,11 @@ self.addEventListener("error", (event) => {
 });
 
 // --- Configuration ---
-const PRODUCTION_API_URL = "https://phishshield-backend.onrender.com";
+const PRODUCTION_API_URL = "https://ai-powered-web-file-security-shield.onrender.com";
 const LOCAL_API_URL = "http://localhost:8000";
-let API_BASE_URL = LOCAL_API_URL; // Default, will be updated from storage
+
+// Start with production URL as default for new installations
+let API_BASE_URL = PRODUCTION_API_URL; 
 const API_KEY = "phishshield-ext-key-2026";
 
 // Initialize config from storage
